@@ -31,6 +31,8 @@ class GoBoard(object):
             return False
         else:
             self.to_play = GoBoardUtil.opponent(color)
+            # Assignment2 - 2.solver
+            self.depth += 1
             return True
 
     @staticmethod
@@ -153,7 +155,10 @@ class GoBoard(object):
         00   01 02 03   04
         """
         self.board = np.ones(self.maxpoint, dtype = np.int16) * BORDER
-        self._empty_filling(self.board) 
+        self._empty_filling(self.board)
+
+        # Assignment2 - 2.solve
+        self.depth = 0
 
 
     def copy(self):

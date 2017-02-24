@@ -161,4 +161,29 @@ class GoBoardUtil(object):
         copy_board.white_captures = board.white_captures
         copy_board.black_captures = board.black_captures 
 
-        
+    # Save time of transforming
+    def generate_legal_moves_fast(board, color):
+        """
+        generate a list of legal moves
+
+        Arguments
+        ---------
+        board : np.array
+            a SIZExSIZE array representing the board
+        color : {'b','w'}
+            the color to generate the move for.
+        """
+        moves = board.get_empty_positions(color)
+        num_moves = len(moves)
+        np.random.shuffle(moves)
+
+        illegal_moves = []
+        for i in range(num_moves):
+            if board.check_legal(moves[i], color):
+                continue
+            else:
+                illegal_moves.append(i)
+        legal_moves = np.delete(moves, illegal_moves)
+        return sorted(legal_moves)
+
+

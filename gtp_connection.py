@@ -11,7 +11,7 @@ from board import GoBoard
 from board_util import GoBoardUtil, BLACK, WHITE, EMPTY, BORDER, FLOODFILL
 import numpy as np
 import re
-import signal
+import signal, time
 
 class GtpConnection():
 
@@ -334,11 +334,7 @@ class GtpConnection():
             board_color = args[0].lower()
             color = GoBoardUtil.color_to_int(board_color)
             _, move = self.solve()
-            if move:
-                # transform the format of move
-                move = GoBoardUtil.move_to_coord(move, self.board.size)
-                move = self.board._coord_to_point(move[0], move[1])
-            else:
+            if not move:
                 move = self.go_engine.get_move(self.board, color)
                 if move is None:
                     self.respond("resign")
@@ -414,6 +410,9 @@ class GtpConnection():
     """
     def solve_cmd(self, args):
         winner, move = self.solve()
+        if move:
+            move = self.board._point_to_coord(move)
+            move = GoBoardUtil.format_point(move)
         self.respond("{} {}".format(winner, move))
 
     """
@@ -442,13 +441,9 @@ class GtpConnection():
     def negamaxBoolean(self, board):
         if board.get_winner() == board.to_play:
             return True, None
-        moves = GoBoardUtil.generate_legal_moves(board, board.to_play).split()
-        for m in moves:
+        for m in GoBoardUtil.generate_legal_moves_fast(board, board.to_play):
             backup = board.copy()
-            # transform the format of move
-            move = GoBoardUtil.move_to_coord(m, board.size)
-            move = board._coord_to_point(move[0], move[1])
-            board.move(move, board.to_play)
+            board.move(m, board.to_play)
             success = not self.negamaxBoolean(board)[0]
             board = backup
             if success:

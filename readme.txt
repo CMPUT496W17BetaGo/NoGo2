@@ -11,7 +11,7 @@ test_case_easy:
 
 test_case_medium:
 1. 50s	< 600 ???
-2. 50s
+2. 50s	> 35.40853579999998
 3. 100s
 
 test_case_hard:

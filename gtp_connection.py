@@ -30,6 +30,10 @@ class GtpConnection():
         self.go_engine = go_engine
         self.komi = 0
         self.board = GoBoard(7)
+        
+        # Assignment2 - 1.timelimit
+        self.timelimit = 1
+        
         self.commands = {
             "protocol_version": self.protocol_version_cmd,
             "quit": self.quit_cmd,
@@ -45,7 +49,13 @@ class GtpConnection():
             "list_commands": self.list_commands_cmd,
             "play": self.play_cmd,
             "final_score": self.final_score_cmd,
-            "legal_moves": self.legal_moves_cmd
+            "legal_moves": self.legal_moves_cmd,
+            
+            # Assignment2 - 1.timelimit
+            "timelimit": self.timelimit_cmd,
+            
+            # Assignment2 - 2.solve
+            "solve": self.solve_cmd,
         }
 
         # used for argument checking
@@ -57,7 +67,10 @@ class GtpConnection():
             "set_free_handicap": (1, 'Usage: set_free_handicap MOVE (e.g. A4)'),
             "genmove": (1, 'Usage: genmove {w, b}'),
             "play": (2, 'Usage: play {b, w} MOVE'),
-            "legal_moves": (1, 'Usage: legal_moves {w, b}')
+            "legal_moves": (1, 'Usage: legal_moves {w, b}'),
+            
+            # Assignment2 - 1.timelimit
+            "timelimit": (1, "Usage: timelimit 1<=INT<=100"),          
         }
     
     def __del__(self):
@@ -300,6 +313,7 @@ class GtpConnection():
     def final_score_cmd(self, args):
         self.respond(self.board.final_score(self.komi))
 
+    # Assignment2 - 3.genmove
     def genmove_cmd(self, args):
         """
         generate a move for the specified color
@@ -334,4 +348,50 @@ class GtpConnection():
             self.respond(board_move)
         except Exception as e:
             self.respond('Error: {}'.format(str(e)))
+            
+    # Assignment2 - 1.timelimit
+    def timelimit_cmd(self, args):
+        """
+        set the maximum time to use for all following genmove or solve commands
+        the default value is 1
+
+        Arguments
+        ---------
+        args[0] : int
+            timelimit
+        """       
+        try:
+            t = int(args[0])
+        except Exception as e:
+            self.respond("Error: {}".format(str(e)))
+            return
+        
+        if t>=1 and t<=100:
+            self.timelimit = t
+            self.respond()
+        else:
+            self.error(self.argmap["timelimit"][1])
+    
+    # Assignment2 - 2.solve
+    def solve_cmd(self, args):
+        # backup for the current state
+        board = self.board
+
+
+
+        
+        self.board = board
+        self.respond("{} {}".format(self.board.to_play, ""))
+
+    def negamaxBoolean(self, board):
+        winner = board.get_winner()
+        if winner:
+            return winner
+        for m in board.legalMoves():
+            board.play(m)
+            success = not self.negamaxBoolean(board)
+            board.undoMove()
+            if success:
+                return True
+        return False
 

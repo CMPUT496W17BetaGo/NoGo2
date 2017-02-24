@@ -469,21 +469,60 @@ class GtpConnection():
             success = not self.negamaxBoolean(board, depth+1)[0]
             board = backup
             if success:
-                # Store the {depth:{state: (winner, move), ...}, ...}
-
-                self.boarddic[depth][board2D] = (board.to_play, m)
-
-                # optimize 2
-                boardarr = board.get_twoD_board()
-                b1 = np.rot90(boardarr)
-                b2 = np.rot90(boardarr, 2)
-                b3 = np.rot90(boardarr, 3)
-                b4 = np.fliplr(boardarr)
-                b5 = np.flipud(boardarr)
-                b6 = np.fliplr(b1)
-                b7 = np.flipud(b1)
-                blist = [b1, b2, b3, b4, b5, b6, b7]
-                for b in blist:
-                    self.boarddic[depth][b.tostring()] = (board.to_play, m)
+                self.boardData(depth, board, m)
                 return True, m
         return False, None
+
+    def boardData(self, depth, board, m):
+        # Store the {depth:{state: (winner, move), ...}, ...}
+        self.boarddic[depth][board.get_twoD_board().tostring()] = (board.to_play, m)
+
+        # optimize 2
+        boardarr = board.get_twoD_board()
+        blist = []
+        blist.append(boardarr.tostring())
+        for i in range(0,7):
+            emptyboard = GoBoard(board.size)
+            emptyboard.move(m, 1)
+
+            if i==0:
+                b = np.rot90(boardarr)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.rot90(emptyboard.get_twoD_board())
+            elif i==1:
+                b = np.rot90(boardarr, 2)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.rot90(emptyboard.get_twoD_board(), 2)
+            elif i==2:
+                b = np.rot90(boardarr, 3)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.rot90(emptyboard.get_twoD_board(), 3)
+            elif i==3:
+                b = np.fliplr(boardarr)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.fliplr(emptyboard.get_twoD_board())
+            elif i==4:
+                b = np.flipud(boardarr)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.flipud(emptyboard.get_twoD_board())
+            elif i==5:
+                b = np.fliplr(np.rot90(boardarr))
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.fliplr(np.rot90(emptyboard.get_twoD_board()))
+            else:
+                b = np.flipud(np.rot90(boardarr))
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.flipud(np.rot90(emptyboard.get_twoD_board()))
+
+            blist.append(b.tostring())
+            index = np.where(empty_move == 1)
+            r, c = index[0][0] + 1, index[1][0] + 1
+            new_move = board._coord_to_point(r, c)
+            self.boarddic[depth][b.tostring()] = (board.to_play, new_move)

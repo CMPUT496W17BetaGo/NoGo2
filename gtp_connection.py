@@ -11,6 +11,7 @@ from board import GoBoard
 from board_util import GoBoardUtil, BLACK, WHITE, EMPTY, BORDER, FLOODFILL
 import numpy as np
 import re
+import signal
 
 class GtpConnection():
 
@@ -33,6 +34,7 @@ class GtpConnection():
         
         # Assignment2 - 1.timelimit
         self.timelimit = 1
+        signal.signal(signal.SIGALRM, self.timeout)
         
         self.commands = {
             "protocol_version": self.protocol_version_cmd,
@@ -313,10 +315,12 @@ class GtpConnection():
     def final_score_cmd(self, args):
         self.respond(self.board.final_score(self.komi))
 
-    # Assignment2 - 3.genmove
+    """
+    Assignment2 - 3.genmove
+    """
     def genmove_cmd(self, args):
         """
-        generate a move for the specified color
+        try to generate a perfect move for the specified color
 
         Arguments
         ---------
@@ -329,10 +333,16 @@ class GtpConnection():
         try:
             board_color = args[0].lower()
             color = GoBoardUtil.color_to_int(board_color)
-            move = self.go_engine.get_move(self.board, color)
-            if move is None:
-                self.respond("pass")
-                return
+            _, move = self.solve()
+            if move:
+                # transform the format of move
+                move = GoBoardUtil.move_to_coord(move, self.board.size)
+                move = self.board._coord_to_point(move[0], move[1])
+            else:
+                move = self.go_engine.get_move(self.board, color)
+                if move is None:
+                    self.respond("resign")
+                    return
 
             if not self.board.check_legal(move, color):
                 move = self.board._point_to_coord(move)
@@ -348,8 +358,34 @@ class GtpConnection():
             self.respond(board_move)
         except Exception as e:
             self.respond('Error: {}'.format(str(e)))
+
+        # try:
+        #     board_color = args[0].lower()
+        #     color = GoBoardUtil.color_to_int(board_color)
+        #     move = self.go_engine.get_move(self.board, color)
+        #     if move is None:
+        #         self.respond("pass")
+        #         return
+        #
+        #     if not self.board.check_legal(move, color):
+        #         move = self.board._point_to_coord(move)
+        #         board_move = GoBoardUtil.format_point(move)
+        #         self.respond("Illegal move: {}".format(board_move))
+        #         raise RuntimeError("Illegal move given by engine")
+        #
+        #     # move is legal; play it
+        #     self.board.move(move, color)
+        #     self.debug_msg("Move: {}\nBoard: \n{}\n".format(move, str(self.board.get_twoD_board())))
+        #     move = self.board._point_to_coord(move)
+        #     board_move = GoBoardUtil.format_point(move)
+        #     self.respond(board_move)
+        # except Exception as e:
+        #     self.respond('Error: {}'.format(str(e)))
+
             
-    # Assignment2 - 1.timelimit
+    """
+    Assignment2 - 1.timelimit
+    """
     def timelimit_cmd(self, args):
         """
         set the maximum time to use for all following genmove or solve commands
@@ -362,36 +398,59 @@ class GtpConnection():
         """       
         try:
             t = int(args[0])
+            if t in range(1, 101):
+                self.timelimit = t
+                self.respond()
+            else:
+                self.error(self.argmap["timelimit"][1])
         except Exception as e:
             self.respond("Error: {}".format(str(e)))
-            return
-        
-        if t>=1 and t<=100:
-            self.timelimit = t
-            self.respond()
-        else:
-            self.error(self.argmap["timelimit"][1])
+
+    def timeout(self, signum, frame):
+        raise Exception("Timeout")
     
-    # Assignment2 - 2.solve
+    """
+    Assignment2 - 2.solve
+    """
     def solve_cmd(self, args):
-        # backup for the current state
-        board = self.board
+        winner, move = self.solve()
+        self.respond("{} {}".format(winner, move))
 
+    """
+    Helper function
+    """
+    def solve(self):
+        board = self.board.copy()
+        try:
+            signal.alarm(self.timelimit)
+            result = self.negamaxBoolean(board)
+            signal.alarm(0)
+        except Exception as e:
+            if str(e) == "Timeout":
+                winner, move = "unknown", ""
+            else:
+                self.respond('Error: {}'.format(str(e)))
+                return
+        else:
+            if result[0]:
+                winner, move = GoBoardUtil.int_to_color(self.board.to_play), result[1]
+            else:
+                winner, move = GoBoardUtil.int_to_color(GoBoardUtil.opponent(self.board.to_play)), ""
+        return winner, move
 
-
-        
-        self.board = board
-        self.respond("{} {}".format(self.board.to_play, ""))
-
+    # Based on https://webdocs.cs.ualberta.ca/~mmueller/courses/496-general/python/code/tic_tac_toe_solve.py
     def negamaxBoolean(self, board):
-        winner = board.get_winner()
-        if winner:
-            return winner
-        for m in board.legalMoves():
-            board.play(m)
-            success = not self.negamaxBoolean(board)
-            board.undoMove()
+        if board.get_winner() == board.to_play:
+            return True, None
+        moves = GoBoardUtil.generate_legal_moves(board, board.to_play).split()
+        for m in moves:
+            backup = board.copy()
+            # transform the format of move
+            move = GoBoardUtil.move_to_coord(m, board.size)
+            move = board._coord_to_point(move[0], move[1])
+            board.move(move, board.to_play)
+            success = not self.negamaxBoolean(board)[0]
+            board = backup
             if success:
-                return True
-        return False
-
+                return True, m
+        return False, None

@@ -100,7 +100,7 @@ class GoBoard(object):
                 if self.get_color(point) != EMPTY:
                     continue
                 moves.append(point)
-        return moves;
+        return moves
 
 
     def __init__(self, size):

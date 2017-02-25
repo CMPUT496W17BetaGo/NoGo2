@@ -462,7 +462,6 @@ class GtpConnection():
 
         if board.get_winner():
             return False, None
-
         for m in GoBoardUtil.generate_legal_moves_fast(board, board.to_play):
             backup = board.copy()
             board.move(m, board.to_play)

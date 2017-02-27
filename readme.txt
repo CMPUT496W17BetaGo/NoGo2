@@ -1,5 +1,21 @@
 # NoGo2
 
+======================
+Shuming Zhang   1401170
+Xinghua Bi      1275127
+Zichong Huang   1398109
+
+
+
+
+
+
+
+
+
+
+
+======================
 Go1_v2.py is for measuring time. It has no time limit.
 
 test_case_easy:
@@ -24,8 +40,7 @@ Store all searched state winner and move
 
 Optimization.2
 Store the state from different angle
-======================
-Shuming Zhang   1401170
+
 
 =================
 Test Command

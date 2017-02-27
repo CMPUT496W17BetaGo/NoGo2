@@ -35,6 +35,9 @@ class GtpConnection():
         # Assignment2 - 1.timelimit
         self.timelimit = 1
         signal.signal(signal.SIGALRM, self.timeout)
+        self.boarddic = {}
+        for d in range(0, 49):
+            self.boarddic[d] = {}
         
         self.commands = {
             "protocol_version": self.protocol_version_cmd,
@@ -178,6 +181,10 @@ class GtpConnection():
         size : int
             the boardsize to reinitialize the state to
         """
+        if size != self.board.size:
+            self.boarddic = {}
+            for depth in range(0, size ** 2):
+                self.boarddic[depth] = {}
         self.board.reset(size)
 
     def protocol_version_cmd(self, args):
@@ -409,27 +416,33 @@ class GtpConnection():
     Assignment2 - 2.solve
     """
     def solve_cmd(self, args):
-        winner, move = self.solve()
-        if move:
-            move = self.board._point_to_coord(move)
-            move = GoBoardUtil.format_point(move)
-        self.respond("{} {}".format(winner, move))
+        try:
+            winner, move = self.solve()
+            if move:
+                move = self.board._point_to_coord(move)
+                move = GoBoardUtil.format_point(move)
+            self.respond("{} {}".format(winner, move))
+        except Exception as e:
+            self.respond("Error: {}".format(str(e)))
 
     """
     Helper function
     """
     def solve(self):
         board = self.board.copy()
+        depth = self.board.depth
         try:
             signal.alarm(self.timelimit)
-            result = self.negamaxBoolean(board)
+            #start = time.process_time()
+            result = self.negamaxBoolean(board, depth)
+            #self.respond("Time: {}".format(str(time.process_time() - start)))
+
             signal.alarm(0)
         except Exception as e:
             if str(e) == "Timeout":
                 winner, move = "unknown", ""
             else:
-                self.respond('Error: {}'.format(str(e)))
-                return
+                raise e
         else:
             if result[0]:
                 winner, move = GoBoardUtil.int_to_color(self.board.to_play), result[1]
@@ -438,14 +451,77 @@ class GtpConnection():
         return winner, move
 
     # Based on https://webdocs.cs.ualberta.ca/~mmueller/courses/496-general/python/code/tic_tac_toe_solve.py
-    def negamaxBoolean(self, board):
-        if board.get_winner() == board.to_play:
-            return True, None
+    def negamaxBoolean(self, board, depth):
+        # optimize
+        board2D = board.get_twoD_board().tostring()
+        if board2D in self.boarddic[depth]:
+            if self.boarddic[depth][board2D][0] == board.to_play:
+                return True, self.boarddic[depth][board2D][1]
+            else:
+                return False, None
+
+        if board.get_winner():
+            return False, None
         for m in GoBoardUtil.generate_legal_moves_fast(board, board.to_play):
             backup = board.copy()
             board.move(m, board.to_play)
-            success = not self.negamaxBoolean(board)[0]
+            success = not self.negamaxBoolean(board, depth+1)[0]
             board = backup
             if success:
+                self.boardData(depth, board, m)
                 return True, m
         return False, None
+
+    def boardData(self, depth, board, m):
+        # Store the {depth:{state: (winner, move), ...}, ...}
+        self.boarddic[depth][board.get_twoD_board().tostring()] = (board.to_play, m)
+
+        # optimize 2
+        boardarr = board.get_twoD_board()
+        blist = []
+        blist.append(boardarr.tostring())
+        for i in range(0,7):
+            emptyboard = GoBoard(board.size)
+            emptyboard.move(m, 1)
+
+            if i==0:
+                b = np.rot90(boardarr)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.rot90(emptyboard.get_twoD_board())
+            elif i==1:
+                b = np.rot90(boardarr, 2)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.rot90(emptyboard.get_twoD_board(), 2)
+            elif i==2:
+                b = np.rot90(boardarr, 3)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.rot90(emptyboard.get_twoD_board(), 3)
+            elif i==3:
+                b = np.fliplr(boardarr)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.fliplr(emptyboard.get_twoD_board())
+            elif i==4:
+                b = np.flipud(boardarr)
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.flipud(emptyboard.get_twoD_board())
+            elif i==5:
+                b = np.fliplr(np.rot90(boardarr))
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.fliplr(np.rot90(emptyboard.get_twoD_board()))
+            else:
+                b = np.flipud(np.rot90(boardarr))
+                if b.tostring() in blist:
+                    continue
+                empty_move = np.flipud(np.rot90(emptyboard.get_twoD_board()))
+
+            blist.append(b.tostring())
+            index = np.where(empty_move == 1)
+            r, c = index[0][0] + 1, index[1][0] + 1
+            new_move = board._coord_to_point(r, c)
+            self.boarddic[depth][b.tostring()] = (board.to_play, new_move)
